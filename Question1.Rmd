@@ -1,0 +1,216 @@
+---
+title: "This report presents an analysis of baby naming trends in the US."
+documentclass: elsarticle
+Thesis_FP: false
+output:
+  pdf_document:
+    keep_tex: true
+    template: Tex/TexDefault.txt
+    fig_width: 3.5
+    fig_height: 3.5
+  pagedown::html_paged: default
+Author1: Katlego Gababonwe
+Ref1: Stellenbosch University, Western Cape
+Email1: 27674193\@sun.ac.za.
+CorrespAuthor_1: false
+BottomRFooter: \footnotesize Page \thepage
+addtoprule: true
+addfootrule: true
+margin: 2.3
+bottom: 2
+top: 2.5
+HardSet_layout: true
+linenumbers: false
+bibliography: Tex/ref.bib
+csl: "Tex/harvard-stellenbosch-university.csl"
+RemovePreprintSubmittedTo: true
+Journal: false
+toc: false
+numbersections: true
+fontsize: 11pt
+linestretch: 1.2
+link-citations: true
+AddTitle: true
+abstract: "TThis report analyses the evolution of baby naming trends in the US from 1910 to 2014 using Spearman rank correlation. Analysing annual rankings of the 25 most popular boys' and girls' names against subsequent years, we investigate the persistence of naming trends over decades. The findings suggest shifts in naming preferences since the 1990s, revealing insights into the dynamics of cultural influences on baby naming practices.\n"
+---
+
+<!-- First: Set your default preferences for chunk options: -->
+
+<!-- If you want a chunk's code to be printed, set echo = TRUE. message = FALSE stops R printing ugly package loading details in your final paper too. I also suggest setting warning = FALSE and checking for warnings in R, else you might find ugly warnings in your paper. -->
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE, fig.width = 6, fig.height = 5, fig.pos="H", fig.pos = 'H')
+
+if(!require("tidyverse")) install.packages("tidyverse")
+library(tidyverse)
+
+list.files("C:/Users/Katli Gabs/Documents/Data Science/27674193/27674193/Question1/Question1/code/Question1_Plots.R", full.names = T, recursive = T) %>% as.list() %>% walk(~source(.))
+
+Baby_Names <- readRDS("C:/Users/Katli Gabs/Documents/Data Science/27674193/27674193/Question1/Question1/data/US_Baby_names/Baby_Names_By_US_State.rds")
+charts <- readRDS("C:/Users/Katli Gabs/Documents/Data Science/27674193/27674193/Question1/Question1/data/US_Baby_names/charts.rds")
+HBO_Titles <- readRDS("C:/Users/Katli Gabs/Documents/Data Science/27674193/27674193/Question1/Question1/data/US_Baby_names/HBO_titles.rds")
+HBO_Credits <- readRDS("C:/Users/Katli Gabs/Documents/Data Science/27674193/27674193/Question1/Question1/data/US_Baby_names/HBO_credits.rds")
+
+```
+
+
+<!-- ############################## -->
+<!-- # Start Writing here: -->
+<!-- ############################## -->
+
+# Introduction \label{Introduction}
+
+Since the 1900s, baby names in the United States have changed a lot due to culture, society, and the media. Some names stay popular for a long time, while others are trendy for a short period because of celebrities, movies, or music. This report explores more than 100 years of naming trends using strong math to find out which names stick around and which ones fade away among America's favorite baby names.
+
+\newpage
+# Spearman Rank Correlation of Baby Names: Before and After 1990 \label{Spearman Rank Correlation of Baby Names: Before and After 1990}
+
+The spearman rank correlation rank, displayed below, illustrates the correlation between baby names before and after 1990. The correlation for boys was generally higher, ranging from 0.1 to 0.5 over the years, while the correlation for girl names was generally lower. However, it spiked a bit just before the 1950s and reverted to the trend again. After the 1990s, the correlation was very high for both boy and girl names, indicating that the names gained popularity as the years advanced. The correlation for girl names was still generally lower until the years close to 2000.
+
+```{r,  warning =  FALSE, fig.align = 'center', fig.cap = " Spearman Rank Correlation of Baby Names: Before and After 1990.\\label{Figure1}", fig.ext = 'png', fig.height = 5, fig.width = 7}
+
+  # Source the plot with a function, and then print it as below.
+    # Going through the function, you will note that I'm able to source other functions in the code folder in these functions too.
+# That's the beauty of centralizing your functions and loading it in the top.
+# Filter the data to include only years from 1990 onwards
+names_data <- Baby_Names %>% filter(Year >= 1990)
+
+# Clean the data: Ensure there are columns for 'Year', 'Name', 'Gender', and 'Count'
+names_data <- Baby_Names %>% filter(!is.na(Year) & !is.na(Name) & !is.na(Gender) & !is.na(Count))
+
+# Extract top 25 boys' and girls' names for each year
+top_25_names <- names_data %>%
+  group_by(Year, Gender) %>%
+  arrange(desc(Count)) %>%
+  slice_head(n = 25)
+
+# Filter the data to include only years from 1990 onwards
+names_data <- Baby_Names %>% filter(Year >= 1990)
+
+# Clean the data: Ensure there are columns for 'Year', 'Name', 'Gender', and 'Count'
+names_data <- Baby_Names %>% filter(!is.na(Year) & !is.na(Name) & !is.na(Gender) & !is.na(Count))
+
+# Calculate rank correlations for each year with the next three years
+calc_spearman <- function(year, gender) {
+  current_year <- top_25_names %>% filter(Year == year & Gender == gender)
+  current_year <- current_year %>% mutate(Rank = rank(-Count))
+
+
+
+  correlations <- data.frame(Year = year, Gender = gender)
+
+  for (i in 1:3) {
+    next_year <- top_25_names %>% filter(Year == year + i & Gender == gender)
+    next_year <- next_year %>% mutate(Rank = rank(-Count))
+
+    if (nrow(current_year) == 25 & nrow(next_year) == 25) {
+      # Merge current year and next year by Name
+      merged_data <- merge(current_year, next_year, by = "Name", suffixes = c("_current", "_next"))
+      # Calculate Spearman correlation on ranks
+      correlation <- cor(merged_data$Rank_current, merged_data$Rank_next, method = "spearman")
+      correlations[[paste0("Year_", year + i)]] <- correlation
+    } else {
+      correlations[[paste0("Year_", year + i)]] <- NA
+    }
+  }
+  return(correlations)
+}
+
+# Apply the function to all years and genders
+correlation_results <- bind_rows(lapply(unique(names_data$Year), function(year) {
+  rbind(calc_spearman(year, "M"), calc_spearman(year, "F"))
+}))
+
+
+# Melt the correlation results for plotting
+correlation_long <- pivot_longer(correlation_results, cols = starts_with("Year_"),
+                                 names_to = "Future_Year", values_to = "Correlation")
+# Create the Period variable
+long_correlation <- correlation_long %>%
+  mutate(Period = ifelse(Year < 1990, "Before 1990", "After 1990"))
+
+# Time-Series Plot of Rank Correlation with Rescaled Y-Axis
+gsperman <- ggplot(long_correlation, aes(x = Year, y = Correlation, color = Gender)) +
+  geom_line() +
+  geom_point() +
+  facet_wrap(~Period, ncol = 1, scales = "free_x") +
+  scale_y_continuous(limits = c(-0.5, 0.5), breaks = seq(-0.5, 0.5, 0.1)) +
+  labs(title = "Spearman Rank Correlation of Baby Names: Before and After 1990",
+       x = "Year",
+       y = "Spearman Rank Correlation") +
+  theme_minimal()
+
+gsperman 
+```
+
+
+\newpage
+#Top10 Artist and Baby names Charts \label{Top10 Artist and Baby names Charts }
+
+The charts below show the top 10 most popular artists, as well as baby names by count. The baby name bubble plot shows that Robert was most popular between the 1925 and 1950's, followed by Michael between the 1950's and 2000. David was most popular between 1950 and 1975. From the graph of popular artists, there seems to be no correlation between popular artist names and baby names.
+
+```{r,  warning =  FALSE, fig.align = 'center', fig.cap = " Top10 Artist and Baby names Charts.\\label{Figure1}", fig.ext = 'png', fig.height = 5, fig.width = 7}
+
+  # Source the plot with a function, and then print it as below.
+    # Going through the function, you will note that I'm able to source other functions in the code folder in these functions too.
+# That's the beauty of centralizing your functions and loading it in the top.
+
+# Example dataset (replace with your actual dataset)
+songs_data <- data.frame(charts)
+
+
+# Group by artist and count occurrences
+artist_counts <- songs_data %>%
+    group_by(artist) %>%
+    summarise(count = n())
+
+# Select top 10 artists based on count
+top10_artists <- artist_counts %>%
+    top_n(10, count)  # Select top 10 artists by count
+
+# Plotting
+ggplot(top10_artists, aes(x = reorder(artist, count), y = count)) +
+    geom_bar(stat = "identity", fill = "green") +
+    labs(x = "Artist", y = "Number of Songs", title = "Top 10 Popular Artists") +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Function to aggregate baby names counts by year
+aggregate_names <- function(Baby_Names) {
+    Baby_Names %>%
+        group_by(Year, Name) %>%
+        summarise(Count = sum(Count)) %>%
+        arrange(desc(Count))
+}
+
+# Aggregate baby names data
+agg_baby_names <- aggregate_names(Baby_Names)
+
+# Select the top 10 names per year and ungroup the data
+top_names_per_year <- agg_baby_names %>%
+    group_by(Year) %>%
+    slice_max(Count, n = 1) %>%
+    ungroup()
+
+# Create the bubble plot with adjusted transparency and size scale
+bubble_plot <- ggplot(top_names_per_year, aes(x = Year, y = Name, size = Count)) +
+    geom_point(alpha = 0.6, color = "powderblue") +  # Adjust color and transparency
+    scale_size_continuous(range = c(2, 15)) +  # Adjust size range as needed
+    labs(
+        title = "Popularity of Baby Names Over Time (Top 10 Names Per Year)",
+        x = "Year",
+        y = "Name",
+        size = "Count"  # Legend title for the size aesthetic
+    ) +
+    theme_minimal() +
+    theme(
+        axis.text.x = element_text(angle = 45, hjust = 1),
+        axis.text.y = element_text(size = 7)
+    )
+
+# Display the plot
+print(bubble_plot)
+```
+
+# Conclusion\label{Conclusion}
+
+The analysis of baby naming trends reveals distinct patterns in name popularity over time. Boys' names generally showed higher consistency, with correlations ranging from 0.1 to 0.5, while girls' names exhibited lower and more variable correlations, except for a brief spike before the 1950s. Post-1990s, both boys' and girls' names showed higher correlations, indicating increased persistence in name popularity. The bubble plot highlighted names like Robert, Michael, and David as dominant in different eras. However, the data suggests no significant correlation between popular artist names and baby naming trends.
